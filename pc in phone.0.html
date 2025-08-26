@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Windows-like Desktop (Demo with Shutdown & Slip)</title>
+<style>
+:root{
+  --taskbar-height:48px;
+  --accent:#0a74da;
+  --glass: rgba(255,255,255,0.06);
+  --text:#eaeaea;
+}
+html,body{
+  height:100%; margin:0;
+  font-family: system-ui, "Segoe UI", Roboto, Arial;
+  background: linear-gradient(180deg,#0f2b45 0%, #0b1624 100%);
+  color:var(--text); -webkit-font-smoothing:antialiased;
+}
+.desktop{
+  position:fixed; inset:0; padding:18px; box-sizing:border-box; overflow:hidden;
+  background-image: radial-gradient(circle at 10% 10%, rgba(255,255,255,0.03), transparent 10%),
+                    radial-gradient(circle at 90% 90%, rgba(255,255,255,0.02), transparent 10%);
+}
+.icons{ display:flex; flex-wrap:wrap; gap:14px; align-content:flex-start; height:calc(100% - var(--taskbar-height)); }
+.icon{ width:80px; text-align:center; cursor:default; user-select:none; color:var(--text);}
+.icon .ico{ font-size:34px; display:block; margin-bottom:6px; width:80px; height:80px; line-height:80px; border-radius:10px; background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border:1px solid rgba(255,255,255,0.03);}
+.icon span{ display:block; font-size:13px; opacity:0.9;}
+
+/* Taskbar */
+.taskbar{ position:fixed; left:0; right:0; bottom:0; height:var(--taskbar-height); background:linear-gradient(180deg, rgba(0,0,0,0.35), rgba(0,0,0,0.45)); display:flex; align-items:center; gap:12px; padding:6px 10px; border-top:1px solid rgba(255,255,255,0.03); backdrop-filter: blur(6px);}
+.start-btn{ display:flex; align-items:center; gap:8px; padding:8px 12px; border-radius:8px; cursor:pointer; background:transparent; border:1px solid transparent;}
+.start-btn:hover{ background:rgba(255,255,255,0.02); border-color:rgba(255,255,255,0.03); }
+.task-icons{ display:flex; gap:8px; align-items:center; flex:1; padding-left:10px; }
+.task .dot{ width:8px; height:8px; background:var(--accent); border-radius:50%; display:inline-block; margin-top:2px; }
+.clock{ min-width:90px; text-align:right; font-size:13px; opacity:0.9; }
+
+/* Start menu */
+.start-menu{ position:fixed; bottom:56px; left:10px; width:320px; max-width:60%; background: linear-gradient(180deg, rgba(20,20,20,0.95), rgba(14,14,14,0.95)); border-radius:10px; padding:12px; box-shadow:0 10px 30px rgba(0,0,0,0.5); display:none; z-index:30;}
+.start-row{ display:flex; gap:10px; flex-wrap:wrap; }
+.tile{ width:64px; height:64px; border-radius:8px; display:flex; align-items:center; justify-content:center; background:var(--glass); border:1px solid rgba(255,255,255,0.03); cursor:pointer; margin-bottom:6px; }
+.search{ margin-top:10px; padding:8px; border-radius:8px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.03); color:var(--text); }
+.power-section{ margin-top:12px; display:flex; gap:12px; }
+
+/* Window */
+.window{ position:absolute; min-width:300px; min-height:160px; background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border-radius:8px; box-shadow:0 10px 30px rgba(0,0,0,0.6); overflow:hidden; border:1px solid rgba(255,255,255,0.04); z-index:10; display:flex; flex-direction:column;}
+.titlebar{ height:36px; display:flex; align-items:center; gap:8px; padding:0 10px; cursor:move; user-select:none; background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent); }
+.titlebar .title{ flex:1; font-weight:600; font-size:14px; }
+.titlebar .controls{ display:flex; gap:8px; }
+.btn{ width:34px; height:28px; display:flex; align-items:center; justify-content:center; border-radius:6px; cursor:pointer; }
+.btn:hover{ background:rgba(255,255,255,0.02); }
+.win-body{ padding:12px; flex:1; overflow:auto; font-size:14px; color:var(--text); }
+.terminal{ background:#071017; color:#cfeefc; padding:10px; border-radius:6px; font-family: monospace; min-height:140px; }
+.link{ color:var(--accent); text-decoration:underline; cursor:pointer; }
+.hidden{ display:none !important; }
+
+/* Shutdown / Lock overlay */
+.overlay{ position:fixed; inset:0; background:#000; color:#fff; display:flex; align-items:center; justify-content:center; font-size:28px; font-weight:700; z-index:9999; display:none; }
+.lock-overlay{ position:fixed; inset:0; background:rgba(0,0,0,0.85); color:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:24px; font-weight:600; z-index:9998; display:none; }
+.lock-overlay input{ padding:8px 10px; font-size:18px; border-radius:6px; border:none; outline:none; margin-top:12px; text-align:center; }
+
+</style>
+</head>
+<body>
+<div class="desktop" id="desktop" tabindex="0">
+  <div class="icons" id="icons">
+    <div class="icon" data-app="explorer"><div class="ico">📁</div><span>Explorer</span></div>
+    <div class="icon" data-app="browser"><div class="ico">🌐</div><span>Browser</span></div>
+    <div class="icon" data-app="terminal"><div class="ico">🖥️</div><span>Terminal</span></div>
+    <div class="icon" data-app="notes"><div class="ico">📝</div><span>Notes</span></div>
+  </div>
+
+  <div class="start-menu" id="startMenu">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div style="width:44px;height:44px;border-radius:10px;background:linear-gradient(180deg,var(--accent),#0b5fb0);display:flex;align-items:center;justify-content:center;font-weight:700;">K</div>
+      <div>
+        <div style="font-weight:700">Khem Singh</div>
+        <div style="font-size:13px; opacity:0.8">Welcome</div>
+      </div>
+    </div>
+    <div class="search">
+      <input id="startSearch" placeholder="Search apps..." style="width:100%; background:transparent; border:none; outline:none; color:var(--text); font-size:14px;" />
+    </div>
+    <div style="margin-top:12px;">
+      <div style="font-size:13px; opacity:0.9; margin-bottom:8px;">Pinned</div>
+      <div class="start-row">
+        <div class="tile" data-app="browser">🌐</div>
+        <div class="tile" data-app="explorer">📁</div>
+        <div class="tile" data-app="terminal">🖥️</div>
+        <div class="tile" data-app="notes">📝</div>
+      </div>
+    </div>
+    <div class="power-section">
+      <button id="btnShutdown" style="flex:1;padding:8px;border-radius:6px;background:#b30000;color:white;border:none;cursor:pointer;">Shutdown</button>
+      <button id="btnSlip" style="flex:1;padding:8px;border-radius:6px;background:#444;color:white;border:none;cursor:pointer;">Slip</button>
+    </div>
+  </div>
+
+  <div id="windows"></div>
+
+  <div class="taskbar" id="taskbar">
+    <div class="start-btn" id="startBtn"><div style="font-size:18px;">🪟</div><div style="font-weight:700">Start</div></div>
+    <div class="task-icons" id="taskIcons"></div>
+    <div class="clock" id="clock">00:00</div>
+  </div>
+</div>
+
+<div class="overlay" id="shutdownOverlay">System Shutdown</div>
+<div class="lock-overlay" id="lockOverlay">
+  Screen Locked
+  <input type="password" id="unlockInput" placeholder="Enter any key to unlock" />
+</div>
+
+<script>
+(function(){
+const startBtn=document.getElementById('startBtn');
+const startMenu=document.getElementById('startMenu');
+const desktop=document.getElementById('desktop');
+const windowsEl=document.getElementById('windows');
+const icons=document.getElementById('icons');
+const taskIcons=document.getElementById('taskIcons');
+const shutdownOverlay=document.getElementById('shutdownOverlay');
+const lockOverlay=document.getElementById('lockOverlay');
+const unlockInput=document.getElementById('unlockInput');
+
+// Clock
+function updateClock(){
+  const d=new Date();
+  const h=d.getHours().toString().padStart(2,'0');
+  const m=d.getMinutes().toString().padStart(2,'0');
+  document.getElementById('clock').textContent=h+':'+m;
+}
+updateClock(); setInterval(updateClock,30000);
+
+// Start menu toggle
+startBtn.addEventListener('click',()=>{ startMenu.style.display=startMenu.style.display!=='block'?'block':'none'; });
+
+// Click outside hides start menu
+document.addEventListener('click',e=>{ if(!startMenu.contains(e.target)&&!startBtn.contains(e.target)) startMenu.style.display='none'; });
+
+// Shutdown button
+document.getElementById('btnShutdown').addEventListener('click',()=>{
+  startMenu.style.display='none';
+  shutdownOverlay.style.display='flex';
+  desktop.querySelectorAll('.icon').forEach(ic=>ic.style.display='none');
+  windowsEl.innerHTML='';
+});
+
+// Slip (lock) button
+document.getElementById('btnSlip').addEventListener('click',()=>{
+  startMenu.style.display='none';
+  lockOverlay.style.display='flex';
+  unlockInput.focus();
+});
+
+// Unlock screen
+unlockInput.addEventListener('keydown',e=>{
+  if(e.key==='Enter'){
+    lockOverlay.style.display='none';
+    unlockInput.value='';
+  }
+});
+
+// Other basic desktop & apps logic (reuse previous code)
+function addTaskIcon(appId,title){
+  if(taskIcons.querySelector('[data-task="'+appId+'"]')) return;
+  const el=document.createElement('div');
+  el.className='task';
+  el.dataset.task=appId;
+  el.title=title;
+  el.innerHTML='<div style="font-size:18px">'+(appId==='browser'?'🌐':appId==='explorer'?'📁':appId==='terminal'?'🖥️':'📝')+'</div>';
+  el.addEventListener('click',()=>{
+    const wnd=document.querySelector('.window[data-app="'+appId+'"]');
+    if(wnd) wnd.style.display=wnd.style.display==='none'?'flex':'none';
+  });
+  taskIcons.appendChild(el);
+}
+
+let winCount=0;
+function openApp(appId){
+  startMenu.style.display='none';
+  const existing=document.querySelector('.window[data-app="'+appId+'"]');
+  if(existing){ existing.style.display='flex'; bringToFront(existing); return; }
+  addTaskIcon(appId,appId.charAt(0).toUpperCase()+appId.slice(1));
+  const win=document.createElement('div');
+  win.className='window';
+  win.dataset.app=appId;
+  win.style.left=(80+winCount*20)+'px';
+  win.style.top=(60+winCount*16)+'px';
+  win.style.width='520px'; win.style.height='360px'; win.style.zIndex=20+winCount;
+  winCount++;
+  win.innerHTML=`<div class="titlebar">
+    <div class="title">${appId==='explorer'?'File Explorer':appId==='browser'?'Web Browser':appId==='terminal'?'Terminal':'Notes'}</div>
+    <div class="controls">
+      <div class="btn" data-action="min">—</div>
+      <div class="btn" data-action="max">▢</div>
+      <div class="btn" data-action="close">✕</div>
+    </div>
+  </div>
+  <div class="win-body">App: ${appId}</div>`;
+  windowsEl.appendChild(win);
+  makeDraggable(win);
+  attachWindowControls(win);
+  bringToFront(win);
+}
+
+// Simple draggable
+function makeDraggable(win){
+  const title=win.querySelector('.titlebar'); let dragging=false,offsetX=0,offsetY=0;
+  title.addEventListener('pointerdown',e=>{ dragging=true; offsetX=e.clientX-win.offsetLeft; offsetY=e.clientY-win.offsetTop; bringToFront(win); });
+  window.addEventListener('pointermove',e=>{ if(!dragging) return; let nx=e.clientX-offsetX; let ny=e.clientY-offsetY; nx=Math.max(6,Math.min(window.innerWidth-win.offsetWidth-6,nx)); ny=Math.max(6,Math.min(window.innerHeight-win.offsetHeight-56,ny)); win.style.left=nx+'px'; win.style.top=ny+'px'; });
+  window.addEventListener('pointerup',()=>{ dragging=false; });
+  win.addEventListener('pointerdown',()=>bringToFront(win));
+}
+
+function attachWindowControls(win){
+  win.querySelectorAll('.btn').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const act=btn.dataset.action;
+      if(act==='close'){ win.remove(); const tid=taskIcons.querySelector('[data-task="'+win.dataset.app+'"]'); if(tid) tid.remove(); }
+      else if(act==='min'){ win.style.display='none'; }
+      else if(act==='max'){
+        const maximized=win.dataset.max==='1';
+        if(!maximized){ win.dataset.oldLeft=win.style.left; win.dataset.oldTop=win.style.top; win.dataset.oldWidth=win.style.width; win.dataset.oldHeight=win.style.height; win.style.left='10px'; win.style.top='10px'; win.style.width=(window.innerWidth-20)+'px'; win.style.height=(window.innerHeight-80)+'px'; win.dataset.max='1'; }
+        else{ win.style.left=win.dataset.oldLeft; win.style.top=win.dataset.oldTop; win.style.width=win.dataset.oldWidth; win.style.height=win.dataset.oldHeight; win.dataset.max='0'; }
+      }
+    });
+  });
+}
+
+function bringToFront(win){ const top=Date.now()%100000; win.style.zIndex=100+top; }
+
+// Double click icons open apps
+icons.querySelectorAll('.icon').forEach(ic=>ic.addEventListener('dblclick',()=>openApp(ic.dataset.app)));
+})();
+</script>
+</body>
+</html>
