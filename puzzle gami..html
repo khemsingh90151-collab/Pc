@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="hi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>3x3 Number Merge Game</title>
+  <style>
+    :root{
+      --bg:#faf8ef;
+      --tile-bg:#cdc1b4;
+      --board-bg:#bbada0;
+      --cell-size:110px;
+      --gap:12px;
+      --radius:12px;
+      --font:'Segoe UI', Roboto, Arial, sans-serif;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:var(--font);
+      background: linear-gradient(180deg,#f2e9df 0%, #efe3d6 100%);
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:20px;
+    }
+
+    .game-wrap{
+      width: calc(var(--cell-size) * 3 + var(--gap) * 2 + 40px);
+      max-width: 420px;
+    }
+
+    header{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      margin-bottom:12px;
+    }
+    h1{font-size:20px;margin:0;color:#776e65}
+    .scores{
+      display:flex;
+      gap:10px;
+      align-items:center;
+    }
+    .score-box{
+      background:#eee4da;padding:8px 12px;border-radius:6px;text-align:center;
+      min-width:72px;
+    }
+    .score-box small{display:block;font-size:11px;color:#776e65}
+    .score-box strong{display:block;font-size:16px;color:#111}
+
+    .board{
+      background:var(--board-bg);
+      padding:20px;
+      border-radius:var(--radius);
+      position:relative;
+    }
+    .grid{
+      display:grid;
+      grid-template-columns:repeat(3, var(--cell-size));
+      grid-template-rows:repeat(3, var(--cell-size));
+      gap:var(--gap);
+      justify-content:center;
+      align-content:center;
+    }
+    .cell{
+      width:var(--cell-size);
+      height:var(--cell-size);
+      background: rgba(238,228,218,0.35);
+      border-radius:8px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-weight:700;
+      font-size:22px;
+      color:#776e65;
+      position:relative;
+      overflow:hidden;
+    }
+    .tile{
+      position:absolute;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      border-radius:8px;
+      font-weight:700;
+      transition: transform 150ms ease, top 150ms ease, left 150ms ease;
+      will-change: transform, top, left;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.12);
+    }
+
+    .tile.v2{background:#eee4da;color:#776e65;font-size:20px}
+    .tile.v4{background:#ede0c8;color:#776e65}
+    .tile.v8{background:#f2b179;color:#fff}
+    .tile.v16{background:#f59563;color:#fff}
+    .tile.v32{background:#f67c5f;color:#fff}
+    .tile.v64{background:#f65e3b;color:#fff}
+    .tile.v128{background:#edcf72;color:#fff;font-size:18px}
+    .tile.v256{background:#edcc61;color:#fff;font-size:18px}
+    .tile.v512{background:#edc850;color:#fff;font-size:18px}
+    .tile.v1024{background:#3c3a32;color:#fff;font-size:16px}
+    .tile.v2048{background:#3c3a32;color:#fff;font-size:16px}
+
+    .controls{margin-top:15px;display:flex;flex-direction:column;align-items:center;gap:10px}
+    .dpad{
+      display:grid;
+      grid-template-columns:60px 60px 60px;
+      grid-template-rows:60px 60px 60px;
+      gap:6px;
+      justify-content:center;
+    }
+    .btn{
+      background:#8f7a66;
+      color:white;
+      font-size:24px;
+      border:none;
+      border-radius:10px;
+      cursor:pointer;
+      min-width:60px;
+      min-height:60px;
+    }
+    .btn.secondary{background:#e0d5ca;color:#333}
+
+    .hint{font-size:13px;color:#6b5b4b;margin-top:10px;text-align:center}
+
+    .overlay{
+      position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+      background:rgba(255,255,255,0.6);backdrop-filter: blur(2px);
+      font-size:22px;color:#776e65;font-weight:700;border-radius:var(--radius);
+      flex-direction:column;gap:10px;
+    }
+
+    @media (max-width:420px){
+      :root{--cell-size:90px}
+      .game-wrap{width:calc(var(--cell-size)*3 + var(--gap)*2 + 40px)}
+      .dpad{grid-template-columns:50px 50px 50px;grid-template-rows:50px 50px 50px}
+      .btn{min-width:50px;min-height:50px;font-size:20px}
+    }
+  </style>
+</head>
+<body>
+  <div class="game-wrap">
+    <header>
+      <h1>3×3 Number Merge</h1>
+      <div class="scores">
+        <div class="score-box">
+          <small>Score</small>
+          <strong id="score">0</strong>
+        </div>
+        <div class="score-box">
+          <small>Best</small>
+          <strong id="best">0</strong>
+        </div>
+      </div>
+    </header>
+
+    <div class="board" id="board">
+      <div class="grid" id="grid">
+        <div class="cell" data-pos="0"></div>
+        <div class="cell" data-pos="1"></div>
+        <div class="cell" data-pos="2"></div>
+        <div class="cell" data-pos="3"></div>
+        <div class="cell" data-pos="4"></div>
+        <div class="cell" data-pos="5"></div>
+        <div class="cell" data-pos="6"></div>
+        <div class="cell" data-pos="7"></div>
+        <div class="cell" data-pos="8"></div>
+      </div>
+
+      <div id="overlay" class="overlay" style="display:none;">
+        <div id="overlayText">Game Over</div>
+        <button class="btn" id="newAfter">New Game</button>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="dpad">
+        <div></div>
+        <button class="btn" id="upBtn">↑</button>
+        <div></div>
+        <button class="btn" id="leftBtn">←</button>
+        <div></div>
+        <button class="btn" id="rightBtn">→</button>
+        <div></div>
+        <button class="btn" id="downBtn">↓</button>
+        <div></div>
+      </div>
+      <button class="btn secondary" id="newGame">New Game</button>
+    </div>
+
+    <div class="hint">Use arrow keys, WASD, or buttons. Swipe on mobile.</div>
+  </div>
+
+  <script>
+    (function(){
+      const SIZE = 3;
+      const CELLS = SIZE * SIZE;
+      let board = new Array(CELLS).fill(0);
+      let score = 0;
+      let best = Number(localStorage.getItem('best2048_3x3') || 0);
+      const gridEl = document.getElementById('grid');
+      const boardEl = document.getElementById('board');
+      const overlay = document.getElementById('overlay');
+      const overlayText = document.getElementById('overlayText');
+      const scoreEl = document.getElementById('score');
+      const bestEl = document.getElementById('best');
+      bestEl.textContent = best;
+
+      function rcFromIndex(i){return {r: Math.floor(i/SIZE), c: i%SIZE};}
+      function idx(r,c){return r*SIZE+c;}
+      function spawnRandom(){
+        const empties = board.map((v,i)=>v===0?i:-1).filter(i=>i>=0);
+        if(!empties.length) return false;
+        const pos = empties[Math.floor(Math.random()*empties.length)];
+        const value = Math.random()<0.9?2:4;
+        board[pos]=value; render(); return true;
+      }
+      function newGame(){
+        board.fill(0); score=0; scoreEl.textContent=score; overlay.style.display='none';
+        spawnRandom(); spawnRandom(); render();
+      }
+      function canMove(){
+        if(board.some(v=>v===0)) return true;
+        for(let r=0;r<SIZE;r++){
+          for(let c=0;c<SIZE;c++){
+            const v=board[idx(r,c)];
+            if(c<SIZE-1 && board[idx(r,c+1)]===v) return true;
+            if(r<SIZE-1 && board[idx(r+1,c)]===v) return true;
+          }
+        }
+        return false;
+      }
+      function compressLine(oldLine){
+        const filtered=oldLine.filter(x=>x!==0); let newLine=[],g=0;
+        for(let i=0;i<filtered.length;i++){
+          if(i+1<filtered.length && filtered[i]===filtered[i+1]){
+            const m=filtered[i]*2; newLine.push(m); g+=m; i++;
+          } else newLine.push(filtered[i]);
+        }
+        while(newLine.length<SIZE) newLine.push(0);
+        return {line:newLine,gained:g};
+      }
+      function move(dir){
+        let moved=false,gTotal=0,newBoard=board.slice();
+        if(dir==='left'||dir==='right'){
+          for(let r=0;r<SIZE;r++){
+            const row=[]; for(let c=0;c<SIZE;c++) row.push(board[idx(r,c)]);
+            const src=(dir==='left')?row:row.slice().reverse();
+            const res=compressLine(src);
+            const out=(dir==='left')?res.line:res.line.slice().reverse();
+            for(let c=0;c<SIZE;c++){ if(newBoard[idx(r,c)]!==out[c]) moved=true; newBoard[idx(r,c)]=out[c]; }
+            gTotal+=res.gained;
+          }
+        } else {
+          for(let c=0;c<SIZE;c++){
+            const col=[]; for(let r=0;r<SIZE;r++) col.push(board[idx(r,c)]);
+            const src=(dir==='up')?col:col.slice().reverse();
+            const res=compressLine(src);
+            const out=(dir==='up')?res.line:res.line.slice().reverse();
+            for(let r=0;r<SIZE;r++){ if(newBoard[idx(r,c)]!==out[r]) moved=true; newBoard[idx(r,c)]=out[r]; }
+            gTotal+=res.gained;
+          }
+        }
+        if(moved){
+          board=newBoard; score+=gTotal; scoreEl.textContent=score;
+          if(score>best){best=score;bestEl.textContent=best;localStorage.setItem('best2048_3x3',best);}
+          spawnRandom(); render();
+          if(!canMove()){overlayText.textContent='Game Over';overlay.style.display='flex';}
+        }
+      }
+      function render(){
+        [...document.querySelectorAll('.tile')].forEach(t=>t.remove());
+        for(let i=0;i<CELLS;i++){
+          const v=board[i]; if(v===0) continue;
+          const cell=gridEl.children[i];
+          const tile=document.createElement('div');
+          tile.className='tile v'+v; tile.textContent=v;
+          tile.style.width=cell.clientWidth+'px'; tile.style.height=cell.clientHeight+'px';
+          tile.style.left=cell.offsetLeft+'px'; tile.style.top=cell.offsetTop+'px';
+          gridEl.appendChild(tile);
+          tile.style.transform='scale(0.01)'; setTimeout(()=>tile.style.transform='scale(1)',20);
+        }
+      }
+      document.getElementById('newGame').onclick=newGame;
+      document.getElementById('newAfter').onclick=newGame;
+      document.getElementById('upBtn').onclick=()=>move('up');
+      document.getElementById('downBtn').onclick=()=>move('down');
+      document.getElementById('leftBtn').onclick=()=>move('left');
+      document.getElementById('rightBtn').onclick=()=>move('right');
+      window.onkeydown=(e)=>{
+        if(['ArrowUp','w','W'].includes(e.key)) move('up');
+        else if(['ArrowDown','s','S'].includes(e.key)) move('down');
+        else if(['ArrowLeft','a','A'].includes(e.key)) move('left');
+        else if(['ArrowRight','d','D'].includes(e.key)) move('right');
+      };
+      let sx=0,sy=0; boardEl.addEventListener('touchstart',e=>{sx=e.touches[0].clientX;sy=e.touches[0].clientY;},{passive:true});
+      boardEl.addEventListener('touchend',e=>{
+        const dx=e.changedTouches[0].clientX-sx,dy=e.changedTouches[0].clientY-sy;
+        if(Math.abs(dx)<20 && Math.abs(dy)<20) return;
+        if(Math.abs(dx)>Math.abs(dy)) dx>0?move('right'):move('left');
+        else dy>0?move('down'):move('up');
+      },{passive:true});
+      newGame();
+    })();
+  </script>
+</body>
+</html>
